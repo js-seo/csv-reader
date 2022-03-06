@@ -1,32 +1,31 @@
-/**
- * Some predefined delay values (in milliseconds).
- */
-export enum Delays {
-  Short = 500,
-  Medium = 2000,
-  Long = 5000,
-}
+import * as fs from 'fs';
+import * as path from 'path';
+import * as csv from 'fast-csv';
+import { forEach, max, mean } from 'lodash'
 
-/**
- * Returns a Promise<string> that resolves after a given time.
- *
- * @param {string} name - A name.
- * @param {number=} [delay=Delays.Medium] - A number of milliseconds to delay resolution of the Promise.
- * @returns {Promise<string>}
- */
-function delayedHello(
-  name: string,
-  delay: number = Delays.Medium,
-): Promise<string> {
-  return new Promise((resolve: (value?: string) => void) =>
-    setTimeout(() => resolve(`Hello, ${name}`), delay),
-  );
-}
+const data: string[] = []
+fs.createReadStream(path.resolve(__dirname, '../../data.csv'))
+  .pipe(csv.parse())
+  .on('error', error => console.error(error))
+  .on('data', row => data.push(row[0]))
+  .on('end', () => {
+    const map: { [key: string]: number[] } = {};
+    data.forEach((row) => {
+      const [key, value] = row.split(': Took ');
+      if (!map[key]) map[key] = [];
+      if (!value) {
+        console.log('no value', row)
+        return;
+      }
+      const numValue = Number(value.split('ms')[0])
+      if (numValue > 100 * 1000) return;
+      map[key].push(numValue);
+    })
+    forEach(map, (numbers, key) => {
+      if (numbers.length < 10) return;
+      console.log(`[${key}]`);
+      console.log(`- Mean: ${mean(numbers)} (${numbers.length})`);
+      // console.log(`- Max: ${max(numbers)}`);
+    })
+  });
 
-// Below are examples of using ESLint errors suppression
-// Here it is suppressing a missing return type definition for the greeter function.
-
-// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-export async function greeter(name: string) {
-  return await delayedHello(name, Delays.Long);
-}
